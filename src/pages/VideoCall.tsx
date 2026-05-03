@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import Layout from "../components/Layout";
-import { Clock3, Headset, Mic, MicOff, Phone, Sparkles, Video } from "lucide-react";
+import { Clock, Headset, Mic, MicOff, Phone, Sparkles, Video } from "lucide-react";
 
 const formatTime = (seconds: number) => {
   const mins = Math.floor(seconds / 60)
