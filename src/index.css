@@ -2045,9 +2045,7 @@ body {
     background: rgba(59, 130, 246, 0.1);
     transform: none;
   }
-}
-}
-
+  
 @media (max-width: 680px) {
   .sidebar {
     width: 100%;
