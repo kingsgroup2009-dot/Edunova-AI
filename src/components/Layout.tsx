@@ -25,7 +25,7 @@ export default function Layout({ children }: LayoutProps) {
   return (
     <div className="app-shell">
       <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
-      <div className={`sidebar-overlay ${isSidebarOpen ? "visible" : ""}`} onClick={() => setIsSidebarOpen(false)} />
+      <div className={`sidebar-overlay ${isSidebarOpen ? "visible" : ""}`} />
       <main className="main-content">
         <div className="mobile-header">
           <button

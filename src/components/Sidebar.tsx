@@ -1,5 +1,6 @@
-import { Link, useLocation } from "react-router-dom";
-import { Video, Star } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Video, Star, X, LogOut } from "lucide-react";
+import { useAuth } from "../context/useAuth";
 
 type SidebarProps = {
   isOpen?: boolean;
@@ -8,6 +9,8 @@ type SidebarProps = {
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { logout, user } = useAuth();
 
   const navLinks = [
     { to: "/dashboard", label: "Dashboard" },
@@ -25,9 +28,24 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     { to: "/leaderboard", label: "Leaderboard" },
   ];
 
+  const handleLogout = async () => {
+    await logout();
+    onClose?.();
+    navigate("/login");
+  };
+
   return (
     <aside className={`sidebar ${isOpen ? "open" : ""}`}>
       <h2 className="sidebar-logo">EduNova AI</h2>
+      {isOpen && (
+        <button className="sidebar-close-btn" onClick={() => onClose?.()}>
+          <X size={20} />
+        </button>
+      )}
+      <div className="sidebar-user">
+        <p className="sidebar-user-name">{user?.name ?? "Learner"}</p>
+        <span className="sidebar-user-email">{user?.email ?? ""}</span>
+      </div>
       <nav className="sidebar-nav">
         {navLinks.map((item) => {
           const active = location.pathname === item.to;
@@ -52,6 +70,9 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           );
         })}
       </nav>
+      <button className="sidebar-logout-btn" type="button" onClick={handleLogout}>
+        <LogOut size={16} /> Sign out
+      </button>
     </aside>
   );
 }

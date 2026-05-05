@@ -1,0 +1,35 @@
+import { signup, login } from './auth'
+import { useState } from 'react'
+
+function App() {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+
+  return (
+    <div>
+      <h2>Signup / Login</h2>
+
+      <input
+        type="email"
+        placeholder="Email"
+        onChange={(e) => setEmail(e.target.value)}
+      />
+
+      <input
+        type="password"
+        placeholder="Password"
+        onChange={(e) => setPassword(e.target.value)}
+      />
+
+      <button onClick={() => signup(email, password)}>
+        Signup
+      </button>
+
+      <button onClick={() => login(email, password)}>
+        Login
+      </button>
+    </div>
+  )
+}
+
+export default App

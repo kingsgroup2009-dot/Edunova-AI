@@ -11,16 +11,17 @@ export type AuthUser = {
 
 export type AuthContextValue = {
   user: AuthUser | null;
-  loginPublic: (email: string, password: string) => boolean;
-  signupPublic: (name: string, email: string, password: string) => boolean;
-  continueWithGoogle: () => void;
+  loading: boolean;
+  loginPublic: (email: string, password: string) => Promise<boolean>;
+  signupPublic: (name: string, email: string, password: string) => Promise<boolean>;
+  continueWithGoogle: () => Promise<void>;
   signupSchool: (
     schoolEmail: string,
     schoolPassword: string,
     studentName: string,
     rollNumber: string
-  ) => boolean;
-  logout: () => void;
+  ) => Promise<boolean>;
+  logout: () => Promise<void>;
 };
 
 export const AuthContext = createContext<AuthContextValue | null>(null);

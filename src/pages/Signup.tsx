@@ -1,45 +1,34 @@
 import { useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 
-type LocationState = {
-  from?: {
-    pathname: string;
-  };
-};
-
-export default function Login() {
+export default function Signup() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const { loginPublic, continueWithGoogle } = useAuth();
+  const { signupPublic, continueWithGoogle } = useAuth();
 
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [working, setWorking] = useState(false);
 
-  const from = (location.state as LocationState)?.from?.pathname || "/dashboard";
-
-  const handleLogin = async () => {
+  const handleSignup = async () => {
     setErrorMessage("");
-
-    if (!email.trim() || !password.trim()) {
-      setErrorMessage("Please enter your email and password.");
+    if (!name.trim() || !email.trim() || !password.trim()) {
+      setErrorMessage("Please complete all fields.");
       return;
     }
 
     setWorking(true);
-    const success = await loginPublic(email.trim(), password);
+    const created = await signupPublic(name.trim(), email.trim(), password);
     setWorking(false);
 
-    if (success) {
-      navigate(from, { replace: true });
+    if (created) {
+      navigate("/dashboard", { replace: true });
       return;
     }
 
-    setErrorMessage(
-      "Login failed. Check your credentials or sign up for a new account."
-    );
+    setErrorMessage("Unable to create account. Check your details and try again.");
   };
 
   const handleGoogle = async () => {
@@ -50,14 +39,24 @@ export default function Login() {
     <main className="auth-page">
       <section className="auth-card premium-card">
         <div className="auth-top">
-          <p className="eyebrow">Secure login</p>
-          <h1>Access your EduNova dashboard.</h1>
+          <p className="eyebrow">Create account</p>
+          <h1>Premium learning starts here.</h1>
           <p className="auth-copy">
-            Login to keep your progress, bookmarks, and premium learning path.
+            Secure your EduNova account and unlock premium tools designed for modern learners.
           </p>
         </div>
 
         <div className="auth-fields">
+          <label>
+            Name
+            <input
+              type="text"
+              autoComplete="name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Your full name"
+            />
+          </label>
           <label>
             Email
             <input
@@ -72,22 +71,18 @@ export default function Login() {
             Password
             <input
               type="password"
-              autoComplete="current-password"
+              autoComplete="new-password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              placeholder="Enter password"
+              placeholder="Choose a strong password"
             />
           </label>
         </div>
 
         {errorMessage && <div className="auth-error">{errorMessage}</div>}
 
-        <button
-          className="primary-btn full-width"
-          onClick={handleLogin}
-          disabled={working}
-        >
-          {working ? "Signing in..." : "Login"}
+        <button className="primary-btn full-width" onClick={handleSignup} disabled={working}>
+          {working ? "Creating account..." : "Create account"}
         </button>
 
         <button className="secondary-btn full-width" onClick={handleGoogle}>
@@ -95,7 +90,7 @@ export default function Login() {
         </button>
 
         <p className="auth-footer">
-          New to EduNova? <Link to="/signup">Create an account</Link>
+          Already have an account? <Link to="/login">Log in</Link>
         </p>
       </section>
     </main>

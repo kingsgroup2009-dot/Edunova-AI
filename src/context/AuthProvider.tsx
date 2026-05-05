@@ -1,163 +1,197 @@
-import { useCallback, useMemo, useState, type ReactNode } from "react";
-import {
-  AuthContext,
-  type AuthUser,
-  type AccountMode,
-} from "./auth-context";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import type { User } from "@supabase/supabase-js";
+import { AuthContext, type AuthUser, type AccountMode } from "./auth-context";
+import { supabase } from "../lib/supabaseClient";
 
-const ACCOUNTS_KEY = "edunova_accounts";
-const SESSION_KEY = "edunova_session";
-
-type StoredAccount = {
-  name: string;
-  password: string;
-  mode: AccountMode;
-  rollNumber?: string;
-};
-
-function loadAccounts(): Record<string, StoredAccount> {
-  try {
-    const raw = localStorage.getItem(ACCOUNTS_KEY);
-    if (!raw) return {};
-    return JSON.parse(raw) as Record<string, StoredAccount>;
-  } catch {
-    return {};
-  }
-}
-
-function saveAccounts(accounts: Record<string, StoredAccount>) {
-  localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
-}
-
-function loadSession(): AuthUser | null {
-  try {
-    const raw = localStorage.getItem(SESSION_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw) as AuthUser;
-  } catch {
-    return null;
-  }
-}
-
-function saveSession(user: AuthUser | null) {
-  if (!user) {
-    localStorage.removeItem(SESSION_KEY);
-    return;
-  }
-  localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+function mapUser(user: User): AuthUser {
+  const metadata = user.user_metadata as Record<string, unknown> | undefined;
+  return {
+    email: user.email ?? "",
+    name: (metadata?.name as string) || user.email || "Learner",
+    mode: (metadata?.mode as AccountMode) || "public",
+    rollNumber: metadata?.rollNumber as string | undefined,
+  };
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(() => loadSession());
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const persistUser = useCallback((next: AuthUser | null) => {
-    setUser(next);
-    saveSession(next);
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadSession() {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!mounted) {
+        return;
+      }
+
+      if (session?.user) {
+        setUser(mapUser(session.user));
+      }
+
+      setLoading(false);
+    }
+
+    loadSession();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        if (!mounted) {
+          return;
+        }
+
+        if (session?.user) {
+          setUser(mapUser(session.user));
+        } else {
+          setUser(null);
+        }
+
+        setLoading(false);
+      }
+    );
+
+    return () => {
+      mounted = false;
+      authListener.subscription.unsubscribe();
+    };
   }, []);
 
   const signupPublic = useCallback(
-    (name: string, email: string, password: string) => {
-      const key = email.trim().toLowerCase();
-      if (!key || !password.trim() || !name.trim()) return false;
-      const accounts = loadAccounts();
-      if (accounts[key]) return false;
-      accounts[key] = {
-        name: name.trim(),
-        password,
-        mode: "public",
-      };
-      saveAccounts(accounts);
-      persistUser({ email: key, name: name.trim(), mode: "public" });
-      return true;
-    },
-    [persistUser]
-  );
-
-  const loginPublic = useCallback(
-    (email: string, password: string) => {
-      const key = email.trim().toLowerCase();
-      const accounts = loadAccounts();
-      const row = accounts[key];
-      if (!row || row.password !== password || row.mode !== "public") {
+    async (name: string, email: string, password: string) => {
+      const normalizedEmail = email.trim().toLowerCase();
+      if (!normalizedEmail || !password.trim() || !name.trim()) {
         return false;
       }
-      persistUser({
-        email: key,
-        name: row.name,
-        mode: "public",
+
+      const { data, error } = await supabase.auth.signUp({
+        email: normalizedEmail,
+        password,
+        options: {
+          data: {
+            name: name.trim(),
+            mode: "public",
+          },
+        },
       });
-      return true;
+
+      if (error) {
+        return false;
+      }
+
+      if (data.user) {
+        setUser(mapUser(data.user));
+        return true;
+      }
+
+      return false;
     },
-    [persistUser]
+    []
   );
 
-  const continueWithGoogle = useCallback(() => {
-    const key = `google_${Date.now()}@edunova.app`;
-    const accounts = loadAccounts();
-    accounts[key] = {
-      name: "Google User",
-      password: "__oauth__",
-      mode: "public",
-    };
-    saveAccounts(accounts);
-    persistUser({ email: key, name: "Google User", mode: "public" });
-  }, [persistUser]);
+  const loginPublic = useCallback(async (email: string, password: string) => {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail || !password.trim()) {
+      return false;
+    }
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: normalizedEmail,
+      password,
+    });
+
+    if (error || !data.session?.user) {
+      return false;
+    }
+
+    setUser(mapUser(data.session.user));
+    return true;
+  }, []);
+
+  const continueWithGoogle = useCallback(async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/dashboard`,
+      },
+    });
+  }, []);
 
   const signupSchool = useCallback(
-    (
+    async (
       schoolEmail: string,
       schoolPassword: string,
       studentName: string,
       rollNumber: string
     ) => {
-      const key = schoolEmail.trim().toLowerCase();
-      const roll = rollNumber.trim();
-      if (!key || !schoolPassword.trim() || !studentName.trim() || !roll) {
+      const normalizedEmail = schoolEmail.trim().toLowerCase();
+      const normalizedRoll = rollNumber.trim();
+
+      if (
+        !normalizedEmail ||
+        !schoolPassword.trim() ||
+        !studentName.trim() ||
+        !normalizedRoll
+      ) {
         return false;
       }
-      const accounts = loadAccounts();
-      const existing = accounts[key];
-      if (existing) {
+
+      const loginResult = await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password: schoolPassword,
+      });
+
+      if (loginResult.data.user) {
+        const metadata = loginResult.data.user.user_metadata as Record<string, unknown>;
         if (
-          existing.mode !== "school" ||
-          existing.password !== schoolPassword ||
-          existing.rollNumber !== roll
+          metadata?.mode !== "school" ||
+          metadata?.rollNumber !== normalizedRoll
         ) {
           return false;
         }
-        persistUser({
-          email: key,
-          name: existing.name,
-          mode: "school",
-          rollNumber: existing.rollNumber,
-        });
+
+        setUser(mapUser(loginResult.data.user));
         return true;
       }
-      accounts[key] = {
-        name: studentName.trim(),
+
+      const { data, error } = await supabase.auth.signUp({
+        email: normalizedEmail,
         password: schoolPassword,
-        mode: "school",
-        rollNumber: roll,
-      };
-      saveAccounts(accounts);
-      persistUser({
-        email: key,
-        name: studentName.trim(),
-        mode: "school",
-        rollNumber: roll,
+        options: {
+          data: {
+            name: studentName.trim(),
+            mode: "school",
+            rollNumber: normalizedRoll,
+          },
+          emailRedirectTo: `${window.location.origin}/dashboard`,
+        },
       });
+
+      if (error) {
+        return false;
+      }
+
+      if (data.user) {
+        setUser(mapUser(data.user));
+      }
+
       return true;
     },
-    [persistUser]
+    []
   );
 
-  const logout = useCallback(() => {
-    persistUser(null);
-  }, [persistUser]);
+  const logout = useCallback(async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+  }, []);
 
   const value = useMemo(
     () => ({
       user,
+      loading,
       loginPublic,
       signupPublic,
       continueWithGoogle,
@@ -166,6 +200,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }),
     [
       user,
+      loading,
       loginPublic,
       signupPublic,
       continueWithGoogle,
